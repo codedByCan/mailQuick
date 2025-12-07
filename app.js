@@ -226,6 +226,46 @@ function postmark(options) {
     }
 }
 
+function smtp(options) {
+    const nodemailer = require('nodemailer');
+    return {
+        send: async function (data) {
+            let { apiKey, from, fromName, server, port, secure } = {
+                apiKey: String(options.apiKey),
+                from: String(options.from),
+                fromName: String(options.fromName),
+                server: String(options.server || 'smtp.gmail.com'),
+                port: Number(options.port || 465),
+                secure: Boolean(options.secure !== undefined ? options.secure : true)
+            };
+            if(!apiKey || !from || !fromName) return { status: false, message: 'Missing required options' };
+            
+            try {
+                let { to, subject, html } = data;
+                if(!to || !subject || !html) return { status: false, message: 'Missing required data' };
+                let transporter = nodemailer.createTransport({
+                    host: server,
+                    port: port,
+                    secure: secure,
+                    auth: {
+                        user: from,
+                        pass: apiKey
+                    }
+                });
+                let info = await transporter.sendMail({
+                    from: `"${fromName}" <${from}>`,
+                    to: to,
+                    subject: subject,
+                    html: html
+                });
+                if(info.messageId) return { status: true, message: 'Mail sent' };
+                else return { status: false, message: 'Mail not sent' };
+            } catch (e) {
+                return { status: false, message: 'Mail not sent' };
+            }
+        }
+    }
+}
 
 module.exports = function () {
     return {
@@ -244,6 +284,8 @@ module.exports = function () {
                     return brevo(this.options).send(data);
                 case 'postmark':
                     return postmark(this.options).send(data);
+                case 'smtp':
+                    return smtp(this.options).send(data);
                 default:
                     return { status: false, message: 'Provider not found' };
             }
